@@ -1,8 +1,10 @@
-const { EC2Client, RunInstancesCommand, DescribeInstancesCommand, TerminateInstancesCommand } = require("@aws-sdk/client-ec2");
-const { S3Client, CreateBucketCommand, ListBucketsCommand, PutObjectCommand, DeleteBucketCommand, ListObjectsV2Command, DeleteObjectCommand } = require("@aws-sdk/client-s3");
-const { SQSClient, CreateQueueCommand, ListQueuesCommand, SendMessageCommand, GetQueueAttributesCommand, ReceiveMessageCommand, DeleteMessageCommand, DeleteQueueCommand } = require("@aws-sdk/client-sqs");
+import { EC2Client, RunInstancesCommand, DescribeInstancesCommand, TerminateInstancesCommand } from "@aws-sdk/client-ec2";
+import { S3Client, CreateBucketCommand, ListBucketsCommand, PutObjectCommand, DeleteBucketCommand, ListObjectsV2Command, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { SQSClient, CreateQueueCommand, ListQueuesCommand, SendMessageCommand, GetQueueAttributesCommand, ReceiveMessageCommand, DeleteMessageCommand, DeleteQueueCommand } from "@aws-sdk/client-sqs";
 
-const region = "us-west-1"; // Replace with your preferred region
+import { credentials } from "./credentials.js";
+
+const region = "us-west-1"; 
 
 const ec2Client = new EC2Client({ credentials, region });
 const s3Client = new S3Client({ credentials, region });
@@ -16,9 +18,8 @@ async function sleep(ms) {
 async function createResources() {
   console.log("Creating resources...");
 
-  // Create EC2 instance
   const ec2Params = {
-    ImageId: "ami-0d53d72369335a9d6", // Amazon Linux 2 AMI ID, replace with appropriate AMI for your region
+    ImageId: "ami-0d53d72369335a9d6", 
     InstanceType: "t2.micro",
     MinCount: 1,
     MaxCount: 1
@@ -28,13 +29,11 @@ async function createResources() {
   const instanceId = ec2Response.Instances[0].InstanceId;
   console.log(`EC2 instance created with ID: ${instanceId}`);
 
-  // Create S3 bucket
   const bucketName = `my-test-bucket-${Date.now()}`;
   const s3Command = new CreateBucketCommand({ Bucket: bucketName });
   await s3Client.send(s3Command);
   console.log(`S3 bucket created: ${bucketName}`);
 
-  // Create SQS queue
   const queueName = `my-test-queue-${Date.now()}`;
   const sqsCommand = new CreateQueueCommand({ QueueName: queueName });
   const sqsResponse = await sqsClient.send(sqsCommand);
@@ -50,12 +49,7 @@ async function createResources() {
 async function listResources() {
   console.log("Listing resources...");
 
-  // List EC2 instances
   const ec2Command = new DescribeInstancesCommand({
-    // Filters: {
-    //   Name: 'instance-state-name',
-    //   Values: 'running'
-    // }
   });
   const ec2Response = await ec2Client.send(ec2Command);
   console.log("EC2 Instances:");
@@ -67,7 +61,6 @@ async function listResources() {
     });
   });
 
-  // List S3 buckets
   const s3Command = new ListBucketsCommand({});
   const s3Response = await s3Client.send(s3Command);
   console.log("S3 Buckets:");
@@ -75,7 +68,6 @@ async function listResources() {
     console.log(`  ${bucket.Name}`);
   });
 
-  // List SQS queues
   const sqsCommand = new ListQueuesCommand({});
   const sqsResponse = await sqsClient.send(sqsCommand);
   console.log("SQS Queues:");
@@ -133,7 +125,6 @@ async function receiveSQSMessage(queueUrl) {
     console.log(`Message title: ${message.MessageAttributes.Title.StringValue}`);
     console.log(`Message body: ${message.Body}`);
 
-    // Delete the message
     const deleteCommand = new DeleteMessageCommand({
       QueueUrl: queueUrl,
       ReceiptHandle: message.ReceiptHandle
@@ -146,8 +137,6 @@ async function receiveSQSMessage(queueUrl) {
 
 async function deleteResources(instanceId, bucketName, queueUrl) {
   console.log("Deleting resources...");
-
-// Empty S3 Bucker
 
   let isTruncated = true;
   let continuationToken = undefined;
@@ -175,17 +164,14 @@ async function deleteResources(instanceId, bucketName, queueUrl) {
     continuationToken = listResponse.NextContinuationToken;
   }
 
-  // Terminate EC2 instance
   const ec2Command = new TerminateInstancesCommand({ InstanceIds: [instanceId] });
   await ec2Client.send(ec2Command);
   console.log(`EC2 instance ${instanceId} termination initiated`);
 
-  // Delete S3 bucket
   const s3Command = new DeleteBucketCommand({ Bucket: bucketName });
   await s3Client.send(s3Command);
   console.log(`S3 bucket ${bucketName} deleted`);
 
-  // Delete SQS queue
   const sqsCommand = new DeleteQueueCommand({ QueueUrl: queueUrl });
   await sqsClient.send(sqsCommand);
   console.log(`SQS queue ${queueUrl} deleted`);
