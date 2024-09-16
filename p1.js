@@ -1,25 +1,13 @@
 const { EC2Client, RunInstancesCommand, DescribeInstancesCommand, TerminateInstancesCommand } = require("@aws-sdk/client-ec2");
 const { S3Client, CreateBucketCommand, ListBucketsCommand, PutObjectCommand, DeleteBucketCommand, ListObjectsV2Command, DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const { SQSClient, CreateQueueCommand, ListQueuesCommand, SendMessageCommand, GetQueueAttributesCommand, ReceiveMessageCommand, DeleteMessageCommand, DeleteQueueCommand } = require("@aws-sdk/client-sqs");
-// Load credentials from shared credentials file
-//import { fromIni } from "@aws-sdk/credential-providers";
-//const credentials = fromIni({ profile: 'default' });
 
-const region = "us-east-1"; // Replace with your preferred region
+const region = "us-west-1"; // Replace with your preferred region
 
 const ec2Client = new EC2Client({ credentials, region });
 const s3Client = new S3Client({ credentials, region });
 const sqsClient = new SQSClient({ credentials, region });
 
-
-
-// const ec2Client = new EC2Client({ 
-//   credentials: {
-//     accessKeyId: 'YOUR_ACCESS_KEY_ID',
-//     secretAccessKey: 'YOUR_SECRET_ACCESS_KEY'
-//   },
-//   region: "us-west-2"  // replace with your region
-// });
 
 async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -30,7 +18,7 @@ async function createResources() {
 
   // Create EC2 instance
   const ec2Params = {
-    ImageId: "ami-0e86e20dae9224db8", // Amazon Linux 2 AMI ID, replace with appropriate AMI for your region
+    ImageId: "ami-0d53d72369335a9d6", // Amazon Linux 2 AMI ID, replace with appropriate AMI for your region
     InstanceType: "t2.micro",
     MinCount: 1,
     MaxCount: 1
@@ -63,12 +51,19 @@ async function listResources() {
   console.log("Listing resources...");
 
   // List EC2 instances
-  const ec2Command = new DescribeInstancesCommand({});
+  const ec2Command = new DescribeInstancesCommand({
+    // Filters: {
+    //   Name: 'instance-state-name',
+    //   Values: 'running'
+    // }
+  });
   const ec2Response = await ec2Client.send(ec2Command);
   console.log("EC2 Instances:");
-  ec2Response.Reservations.forEach(reservation => {
+  ec2Response.Reservations?.forEach(reservation => {
     reservation.Instances.forEach(instance => {
-      console.log(`  ${instance.InstanceId}`);
+      if(instance.State.Name === 'running') {
+        console.log(`  ${instance.InstanceId}`);
+      }
     });
   });
 
@@ -76,7 +71,7 @@ async function listResources() {
   const s3Command = new ListBucketsCommand({});
   const s3Response = await s3Client.send(s3Command);
   console.log("S3 Buckets:");
-  s3Response.Buckets.forEach(bucket => {
+  s3Response.Buckets?.forEach(bucket => {
     console.log(`  ${bucket.Name}`);
   });
 
@@ -84,7 +79,7 @@ async function listResources() {
   const sqsCommand = new ListQueuesCommand({});
   const sqsResponse = await sqsClient.send(sqsCommand);
   console.log("SQS Queues:");
-  sqsResponse.QueueUrls.forEach(queueUrl => {
+  sqsResponse.QueueUrls?.forEach(queueUrl => {
     console.log(`  ${queueUrl}`);
   });
 }
@@ -211,8 +206,8 @@ async function main() {
     
     await deleteResources(instanceId, bucketName, queueUrl);
     
-    console.log("Waiting for 20 seconds...");
-    await sleep(20000);
+    console.log("Waiting for 1 minute...");
+    await sleep(60000);
     
     await listResources();
   } catch (error) {
